@@ -40,7 +40,6 @@ class DataConfig:
 # ---------------------------------------------------------------------
 # Core download functions
 # ---------------------------------------------------------------------
-
 def download_single_ticker(
     ticker: str,
     start_date: str,
@@ -61,7 +60,7 @@ def download_single_ticker(
     Returns
     -------
     pd.DataFrame
-        DataFrame indexed by date with OHLCV-style columns.
+        DataFrame indexed by date with flat OHLCV-style columns.
 
     Raises
     ------
@@ -83,30 +82,29 @@ def download_single_ticker(
     df = df.copy()
     df.index = pd.to_datetime(df.index)
     df.sort_index(inplace=True)
-    return df
 
+    # Flatten MultiIndex columns if yfinance returns them
+    if isinstance(df.columns, pd.MultiIndex):
+        if len(df.columns.levels) == 2:
+            # Usually looks like ('Close', 'SPY')
+            df.columns = df.columns.get_level_values(0)
+        else:
+            df.columns = [
+                "_".join(str(part) for part in col if part != "")
+                for col in df.columns.to_flat_index()
+            ]
+
+    return df
 
 def standardize_ohlcv_columns(df: pd.DataFrame, prefix: str) -> pd.DataFrame:
     """
     Rename OHLCV columns using a consistent prefix.
-
-    Example:
-        Open -> spy_open
-        Adj Close -> spy_adj_close
-        Volume -> spy_volume
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Raw OHLCV DataFrame.
-    prefix : str
-        Short internal asset name, e.g. 'spy', 'vix', 'tnx'.
-
-    Returns
-    -------
-    pd.DataFrame
-        Renamed DataFrame.
     """
+    out = df.copy()
+
+    # Defensive cleanup in case columns are not plain strings
+    out.columns = [str(col) for col in out.columns]
+
     rename_map = {
         "Open": f"{prefix}_open",
         "High": f"{prefix}_high",
@@ -116,13 +114,11 @@ def standardize_ohlcv_columns(df: pd.DataFrame, prefix: str) -> pd.DataFrame:
         "Volume": f"{prefix}_volume",
     }
 
-    available_map = {k: v for k, v in rename_map.items() if k in df.columns}
-    out = df.rename(columns=available_map).copy()
+    available_map = {k: v for k, v in rename_map.items() if k in out.columns}
+    out = out.rename(columns=available_map)
 
-    # Standardize index name for easier downstream joins / saves
     out.index.name = "date"
     return out
-
 
 def download_market_data(config: DataConfig) -> Dict[str, pd.DataFrame]:
     """
@@ -219,21 +215,18 @@ def clean_market_data(df: pd.DataFrame) -> pd.DataFrame:
 def select_research_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Keep only the columns most useful for downstream research.
-
-    For a first-pass quant project, adjusted close is usually the most important
-    price series for return calculations. We keep close/adj_close and volume
-    if available, while leaving room to retain OHLC data if needed later.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Clean merged dataset.
-
-    Returns
-    -------
-    pd.DataFrame
-        Reduced dataset for research use.
     """
+    out = df.copy()
+
+    # Ensure flat string columns
+    if isinstance(out.columns, pd.MultiIndex):
+        out.columns = [
+            "_".join(str(part) for part in col if part != "")
+            for col in out.columns.to_flat_index()
+        ]
+    else:
+        out.columns = [str(col) for col in out.columns]
+
     preferred_columns = [
         "spy_close",
         "spy_adj_close",
@@ -244,15 +237,17 @@ def select_research_columns(df: pd.DataFrame) -> pd.DataFrame:
         "tnx_adj_close",
     ]
 
-    existing = [col for col in preferred_columns if col in df.columns]
+    existing = [col for col in preferred_columns if col in out.columns]
 
     if not existing:
-        raise ValueError("None of the preferred research columns are present.")
+        raise ValueError(
+            f"None of the preferred research columns are present. "
+            f"Available columns: {list(out.columns)}"
+        )
 
-    out = df[existing].copy()
+    out = out.loc[:, existing].copy()
     out.index.name = "date"
     return out
-
 
 # ---------------------------------------------------------------------
 # Persistence
