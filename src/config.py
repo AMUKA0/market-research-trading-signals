@@ -34,3 +34,19 @@ VIX_CHANGE_WINDOW = 20
 TNX_CHANGE_WINDOW = 20
 
 DRAWDOWN_WINDOW = 252  
+
+# ---------------------------------------------------------------------
+# Regime thresholds (Version 2)
+# ---------------------------------------------------------------------
+
+VIX_LOW_THRESHOLD = 18.0
+VIX_HIGH_THRESHOLD = 25.0
+
+STRESS_DRAWDOWN_THRESHOLD = -0.10
+RISK_OFF_DRAWDOWN_THRESHOLD = -0.15
+
+RECOVERY_VIX_MIN_THRESHOLD = 18.0
+
+VOL_REGIME_LOOKBACK = 252
+VOL_LOW_QUANTILE = 0.50
+VOL_HIGH_QUANTILE = 0.75
