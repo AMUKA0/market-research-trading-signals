@@ -86,13 +86,28 @@ def summarize_signal_distribution(df: pd.DataFrame) -> pd.DataFrame:
         "proportion": df["target_exposure"].value_counts(normalize=True),
     })
 
-
 # ---------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------
 
-def build_signals(df: pd.DataFrame) -> pd.DataFrame:
+def build_signals(df: pd.DataFrame, mapping: Dict[str, float] | None = None) -> pd.DataFrame:
+    """
+    Full signal-construction pipeline.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe containing regime labels.
+    mapping : dict[str, float] | None
+        Optional custom regime-to-exposure mapping. If None, uses the default
+        mapping from config.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe with target exposure and rebalance helper columns.
+    """
     out = df.copy()
-    out = map_regime_to_exposure(out)
+    out = map_regime_to_exposure(out, mapping=mapping)
     out = add_position_change_flags(out)
     return out
